@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Brians Game of Things</title>
+<style>
+body {
+    /* background-color: black; */
+}
+.response-container {
+    /* min-width: 100px; */
+    height: 40px;
+    padding: 10px;
+    background-color: grey;
+    margin: 2px;
+}
+.response-text {
+    /* height: 20px; */
+    padding-left: 10px;
+    color: white;
+}
+#qrcode {
+    padding: 10px;
+    height: 200px;
+}
+
+</style>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ" crossorigin="anonymous">
+</head>
+<body>
+<div class="container">
+    <a id="url" target="_blank">waiting for peer creation...</a>
+    <div id="qrcode"></div>
+</div>
+<div class="container">
+    <div id="host-controls" hidden>
+        <button onclick="clearResponses()" class="btn btn-secondary">clear</button>
+        <button onclick="reveal()" class="btn btn-secondary">reveal</button>
+    </div>
+    <form class="input-group mb-3" id="input-form">
+        <input id="text-input" type="password" type="text" class="form-control" placeholder="your answer..." aria-label="Recipient's username" aria-describedby="basic-addon2">
+        <div class="input-group-append">
+          <input type="submit" id="send-btn" disabled class="btn btn-outline-secondary" type="button">
+        </div>
+    </form>
+</div>
+
+<div id="responses">
+
+</div>
+<!-- <input type="submit" value="Send" id="send-btn"/> -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe" crossorigin="anonymous"></script>
+
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<script>
+
+const textInput= document.getElementById("text-input");
+const hostControls= document.getElementById("host-controls");
+const sendBtn = document.getElementById("send-btn");
+const inputForm = document.getElementById("input-form");
+const responsesDisplay = document.getElementById("responses");
+const urlDisplay = document.getElementById("url");
+
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+
+const host = urlParams.get("host");
+let hostId = host;
+
+// var hostId = "briansgameofthingshostasdafaffle"
+var randLetter = () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random()*26)];
+var randId = randLetter()+randLetter()+randLetter()+randLetter();
+var myId = randId;
+console.log(myId);
+var peer = new Peer("briansgameofthings"+myId);
+var peerConnections = [];
+var responses = [];
+var isHost = true;
+
+function processResponse(data) {
+    console.log(data);
+    if(data=="./clear") {
+        clearResponses();
+        return;
+    }
+    if(data=="./reveal") {
+        reveal();
+        return;
+    }
+    responses.push(data);
+    responsesDisplay.innerHTML+=`<div class="response-container container-fluid">
+        <div class="response-text" hidden>
+        ${data}
+        </div>
+        </div>`
+    if(!isHost)return;
+    peerConnections.forEach(con=>{
+        con.send(data);
+    })
+}
+
+function reveal() {
+    document.querySelectorAll(".response-text").forEach(e=>{
+        e.hidden = false;
+    })
+    if(!isHost)return;
+    peerConnections.forEach(con=>{
+        // con.send("./clear");
+        // responses.forEach(r=>{
+        //     con.send(r)
+        // })
+        con.send("./reveal");
+    })
+}
+
+function clearResponses() {
+    responses = [];
+    responsesDisplay.innerHTML = "";
+    if(!isHost)return;
+    peerConnections.forEach(con=>{
+        con.send("./clear");
+    })
+}
+
+peer.on("open", function(id) { 
+    if(host == null){
+        //you are the host
+        hostId = myId;
+        // urlParams.append("host", hostId);
+        // console.log(urlParams);
+        displayQRCode(window.location.href+"?host="+hostId);
+        setUpHost();
+        hostControls.hidden = false;
+    } else {
+        isHost = false;
+        displayQRCode(window.location.href);
+        connectToHost();
+    }
+})
+function setUpHost() {
+    peer.on('connection', function(conn) {
+        console.log("peer connected", conn);
+        peerConnections.push(conn);
+        conn.on('data', processResponse);
+    });
+    sendBtn.disabled= false;
+    inputForm.addEventListener('submit', function(e) {
+        processResponse(textInput.value);
+        textInput.value = "";
+        e.preventDefault();
+    });
+}
+function connectToHost(){
+    var hostPeer = "briansgameofthings"+hostId;
+    console.log(peer.id);
+    console.log("attempting to connect to " + hostPeer);
+    var conn = peer.connect(hostPeer);
+    conn.on('open', function(){
+        console.log("connected to host", conn);
+        // here you have conn.id
+        // conn.send('hi!');
+        sendBtn.disabled = false;
+        inputForm.addEventListener('submit', function(e){
+            conn.send(textInput.value);
+            textInput.value = "";
+            e.preventDefault();
+        });
+    });
+    conn.on('data', processResponse);
+}
+
+
+function displayQRCode(url) {
+    urlDisplay.innerHTML = url;
+    urlDisplay.href = url;
+    const qrcode = new QRCode(document.getElementById('qrcode'), {
+        text: url,
+        width: 128,
+        height: 128,
+        colorDark : '#000',
+        colorLight : '#fff',
+        correctLevel : QRCode.CorrectLevel.H
+    });
+}
+</script>
+</body>
+</html>
