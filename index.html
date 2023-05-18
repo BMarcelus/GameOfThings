@@ -38,6 +38,7 @@ body {
         <button onclick="clearResponses()" class="btn btn-secondary">clear</button>
         <button onclick="reveal()" class="btn btn-secondary">reveal</button>
     </div>
+    <div id="connected-display-count"></div>
     <form class="input-group mb-3" id="input-form">
         <input id="text-input" type="password" type="text" class="form-control" placeholder="your answer..." aria-label="Recipient's username" aria-describedby="basic-addon2">
         <div class="input-group-append">
@@ -62,6 +63,7 @@ const sendBtn = document.getElementById("send-btn");
 const inputForm = document.getElementById("input-form");
 const responsesDisplay = document.getElementById("responses");
 const urlDisplay = document.getElementById("url");
+const connectedDisplayCount = document.getElementById("connected-display-count");
 
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
@@ -78,6 +80,20 @@ var peer = new Peer("briansgameofthings"+myId);
 var peerConnections = [];
 var responses = [];
 var isHost = true;
+var uid = getUID();
+
+function getUID() {
+    var id = localStorage.getItem("briansgameofthingsuid");
+    if(id)return id;
+    id = generateUID()
+    localStorage.setItem("briansgameofthingsuid", id);
+    return id;
+}
+
+function generateUID() {
+    var id = Math.random();
+    return id;
+}
 
 function processResponse(data) {
     console.log(data);
@@ -124,6 +140,27 @@ function clearResponses() {
     })
 }
 
+function updateDisplayCount() {
+    connectedDisplayCount.innerHTML = "connected: "+peerConnections.length;
+}
+
+function addPeer(conn) {
+    peerConnections.push(conn);
+    updateDisplayCount();
+}
+
+function removePeer(conn) {
+    for(var i=0;i<peerConnections.length;i++) {
+        var c = peerConnections[i];
+        if(c==conn) {
+            peerConnections.splice(i,1);
+            updateDisplayCount();
+            return;
+        }
+    }
+    // peerConnections.splice(peerConnections.indexOf(conn), 1);
+}
+
 peer.on("open", function(id) { 
     if(host == null){
         //you are the host
@@ -142,9 +179,13 @@ peer.on("open", function(id) {
 function setUpHost() {
     peer.on('connection', function(conn) {
         console.log("peer connected", conn);
-        peerConnections.push(conn);
+        addPeer(conn);
         conn.on('data', processResponse);
+        conn.on('close', function() {
+            removePeer(conn);
+        })
     });
+    
     sendBtn.disabled= false;
     inputForm.addEventListener('submit', function(e) {
         processResponse(textInput.value);
@@ -156,7 +197,7 @@ function connectToHost(){
     var hostPeer = "briansgameofthings"+hostId;
     console.log(peer.id);
     console.log("attempting to connect to " + hostPeer);
-    var conn = peer.connect(hostPeer);
+    var conn = peer.connect(hostPeer, {metadata: uid});
     conn.on('open', function(){
         console.log("connected to host", conn);
         // here you have conn.id
@@ -169,6 +210,14 @@ function connectToHost(){
         });
     });
     conn.on('data', processResponse);
+
+    window.onbeforeunload = function(){
+        conn.close();
+    }
+    // OR
+    window.addEventListener("beforeunload", function(e){
+        conn.close();
+    }, false);
 }
 
 
