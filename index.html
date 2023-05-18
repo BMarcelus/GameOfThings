@@ -188,9 +188,10 @@ function setUpHost() {
     
     sendBtn.disabled= false;
     inputForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if(textInput.value=="")return;
         processResponse(textInput.value);
         textInput.value = "";
-        e.preventDefault();
     });
 }
 function connectToHost(){
@@ -204,9 +205,10 @@ function connectToHost(){
         // conn.send('hi!');
         sendBtn.disabled = false;
         inputForm.addEventListener('submit', function(e){
+            e.preventDefault();
+            if(textInput.value=="")return;
             conn.send(textInput.value);
             textInput.value = "";
-            e.preventDefault();
         });
     });
     conn.on('data', processResponse);
