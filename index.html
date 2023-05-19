@@ -10,7 +10,7 @@ body {
 }
 .response-container {
     /* min-width: 100px; */
-    height: 40px;
+    min-height: 40px;
     padding: 10px;
     background-color: grey;
     margin: 2px;
@@ -34,13 +34,13 @@ body {
     <div id="qrcode"></div>
 </div>
 <div class="container">
-    <div id="host-controls" hidden>
+    <div class="container" id="host-controls" hidden>
         <button onclick="clearResponses()" class="btn btn-secondary">clear</button>
         <button onclick="reveal()" class="btn btn-secondary">reveal</button>
     </div>
     <div id="connected-display-count"></div>
     <form class="input-group mb-3" id="input-form">
-        <input id="text-input" type="password" type="text" class="form-control" placeholder="your answer..." aria-label="Recipient's username" aria-describedby="basic-addon2">
+        <input id="text-input" type="text" class="form-control" placeholder="your answer..." aria-label="Recipient's username" aria-describedby="basic-addon2">
         <div class="input-group-append">
           <input type="submit" id="send-btn" disabled class="btn btn-outline-secondary" type="button">
         </div>
@@ -106,7 +106,7 @@ function processResponse(data) {
         return;
     }
     responses.push(data);
-    responsesDisplay.innerHTML+=`<div class="response-container container-fluid">
+    responsesDisplay.innerHTML+=`<div class="response-container container-fluid shuffleMe">
         <div class="response-text" hidden>
         ${data}
         </div>
@@ -117,8 +117,32 @@ function processResponse(data) {
     })
 }
 
+function shuffle() {
+  var container = responsesDisplay;
+  var elementsArray = Array.prototype.slice.call(container.getElementsByClassName('shuffleMe'));
+    elementsArray.forEach(function(element){
+    container.removeChild(element);
+  })
+  shuffleArray(elementsArray);
+  elementsArray.forEach(function(element){
+   container.appendChild(element);
+  })
+}
+
+function shuffleArray(array) {
+    for (var i = array.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+    return array;
+}
+
 function reveal() {
-    document.querySelectorAll(".response-text").forEach(e=>{
+    var responses = document.querySelectorAll(".response-text")
+    shuffle();
+    responses.forEach(e=>{
         e.hidden = false;
     })
     if(!isHost)return;
@@ -165,9 +189,12 @@ peer.on("open", function(id) {
     if(host == null){
         //you are the host
         hostId = myId;
-        // urlParams.append("host", hostId);
-        // console.log(urlParams);
-        displayQRCode(window.location.href+"?host="+hostId);
+        urlParams.append("host", hostId);
+        console.log(urlParams);
+        var url = location.protocol + '//' + location.host + location.pathname;
+        url+="?"+urlParams.toString();
+        console.log(url);
+        displayQRCode(url);
         setUpHost();
         hostControls.hidden = false;
     } else {
